@@ -104,12 +104,12 @@
               "ikmE": {
                 "type": "string",
                 "format": "HexBytes",
-                "description": "Optional. The sender's encapsulation randomness (32 bytes for ML-KEM). Present for valid cases, where deterministic encapsulation reproduces enc and ct. Absent for invalid cases."
+                "description": "Optional. The 32-byte seed fixing the sender's ephemeral key (the encapsulation randomness for ML-KEM, the ephemeral private key skEm for DHKEM(X25519)). Present for valid cases, where deterministic encapsulation reproduces enc and ct. Absent for invalid cases."
               },
               "skRm": {
                 "type": "string",
                 "format": "HexBytes",
-                "description": "Optional. The recipient private key (64-byte d || z seed) corresponding to pkRm, when one exists. Present lets a consumer additionally decapsulate enc and open ct to recover pt."
+                "description": "Optional. The recipient private key corresponding to pkRm, when one exists (the 64-byte d || z seed for ML-KEM, the 32-byte scalar for DHKEM(X25519)). Present lets a consumer additionally decapsulate enc and open ct to recover pt."
               },
               "info": {
                 "type": "string",

@@ -88,7 +88,7 @@ key; it can also be derived from `skRm`.
 
 Valid decryption cases also carry `ikmE`, the 32-byte seed that fixes the
 sender's ephemeral key: for ML-KEM the encapsulation randomness, for
-DHKEM(X25519) the ephemeral private key `skEm` (what a deterministic-
+DHKEM(X25519) the ephemeral private key `skEm` (what a deterministic
 encapsulation hook consumes, not RFC 9180's `DeriveKeyPair` ikm). With `ikmE`
 fixed, encapsulation is deterministic, so an implementation with such a hook
 can also check the sender direction: run `SetupBaseS(pkRm, info)` seeded with
