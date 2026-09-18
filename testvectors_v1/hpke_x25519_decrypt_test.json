@@ -1,14 +1,34 @@
 {
   "algorithm": "HPKE",
   "schema": "hpke_decrypt_test_schema.json",
-  "numberOfTests": 20,
+  "numberOfTests": 23,
   "header": [
-    "HPKE (RFC 9180) base-mode decryption (SetupBaseR then Open) with DHKEM(X25519, HKDF-SHA256). See doc/hpke.md."
+    "Test vectors for HPKE (RFC 9180) single-shot Open in base mode",
+    "using DHKEM(X25519, HKDF-SHA256), a classical Diffie-Hellman KEM.",
+    "This is a second HPKE instantiation alongside the ML-KEM files",
+    "that reuses the same schema unchanged. The recipient private key",
+    "skRm is the 32-byte X25519 scalar (Nsk = 32). Valid cases include",
+    "ikmE, the sender's 32-byte ephemeral private key, so deterministic",
+    "encapsulation reproduces enc and ct. Given (skRm, info, aad, enc,",
+    "ct) an implementation runs SetupBaseR then Open and must recover",
+    "pt for valid cases or reject invalid cases. See doc/hpke.md."
   ],
   "notes": {
     "AppendedByteCiphertext": {
       "bugType": "AUTH_BYPASS",
       "description": "A trailing byte was appended to the AEAD ciphertext."
+    },
+    "EmbeddedZeroAad": {
+      "bugType": "EDGE_CASE",
+      "description": "The AEAD associated data contains embedded zero bytes."
+    },
+    "EmbeddedZeroInfo": {
+      "bugType": "EDGE_CASE",
+      "description": "The HPKE info contains embedded zero bytes, catching a consumer that mishandles them (e.g. treats info as null-terminated)."
+    },
+    "EmbeddedZeroPlaintext": {
+      "bugType": "EDGE_CASE",
+      "description": "The plaintext contains embedded zero bytes."
     },
     "EmptyAad": {
       "bugType": "EDGE_CASE",
@@ -175,6 +195,57 @@
         },
         {
           "tcId": 6,
+          "comment": "valid with info containing embedded zero bytes",
+          "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
+          "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
+          "ikmE": "cb9dcbe59dd0e551d7b2b74669a21bdcabd03f1a98b42574803574070f73c2b1",
+          "info": "f0000f00ff",
+          "aad": "777963686570726f6f6620616164",
+          "enc": "e48f111d3166a5463ba33b05a3ce96b0c2b24db8c30f85f4f1e0f3cbaa0d5259",
+          "ct": "6112e469aaa9efa302b856aaf92e3db2aa9240875a74b03e5d1048e0d9426ce9f5d4b3d46b4fafeebb14f2109e",
+          "pt": "4265617574792069732074727574682c20747275746820626561757479",
+          "result": "valid",
+          "flags": [
+            "Pseudorandom",
+            "EmbeddedZeroInfo"
+          ]
+        },
+        {
+          "tcId": 7,
+          "comment": "valid with aad containing embedded zero bytes",
+          "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
+          "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
+          "ikmE": "77d6861dbbea787b9f9bbb4624df0dd3f1c99881fc3c68005c36aa11b18aae58",
+          "info": "777963686570726f6f662068706b6520696e666f",
+          "aad": "00ff00ff00",
+          "enc": "9a844973c6913306fcccd0bed2bb06a66439be7e14eb15781731bbfe2e64877d",
+          "ct": "ae208eaa0ce73ddebd6e86ea244fbc6bd9c766ebc26b9d3edd189d7e6144937e64f3e927d72f0477b8d11d4a6e",
+          "pt": "4265617574792069732074727574682c20747275746820626561757479",
+          "result": "valid",
+          "flags": [
+            "Pseudorandom",
+            "EmbeddedZeroAad"
+          ]
+        },
+        {
+          "tcId": 8,
+          "comment": "valid with plaintext containing embedded zero bytes",
+          "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
+          "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
+          "ikmE": "3a257c3138156ed40d9cdf7e38d0802c4add147d4e609a2fdb42b798c090eca4",
+          "info": "777963686570726f6f662068706b6520696e666f",
+          "aad": "777963686570726f6f6620616164",
+          "enc": "eec9fb5b337c0176d4cb22d3ca0408334f2da2346375ad548c84f3772ec1e648",
+          "ct": "6cf8ce357fd9d215b172d751191a256463282fd1546104",
+          "pt": "00010002000300",
+          "result": "valid",
+          "flags": [
+            "Pseudorandom",
+            "EmbeddedZeroPlaintext"
+          ]
+        },
+        {
+          "tcId": 9,
           "comment": "flipped low bit of first enc byte",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -189,7 +260,7 @@
           ]
         },
         {
-          "tcId": 7,
+          "tcId": 10,
           "comment": "flipped high bit of last enc byte",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -204,7 +275,7 @@
           ]
         },
         {
-          "tcId": 8,
+          "tcId": 11,
           "comment": "all-zero enc (small-order point)",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -219,7 +290,7 @@
           ]
         },
         {
-          "tcId": 9,
+          "tcId": 12,
           "comment": "empty enc",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -234,7 +305,7 @@
           ]
         },
         {
-          "tcId": 10,
+          "tcId": 13,
           "comment": "enc one byte short",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -249,7 +320,7 @@
           ]
         },
         {
-          "tcId": 11,
+          "tcId": 14,
           "comment": "enc one byte long",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -264,7 +335,7 @@
           ]
         },
         {
-          "tcId": 12,
+          "tcId": 15,
           "comment": "enc and ct are valid for a different recipient key",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -279,7 +350,7 @@
           ]
         },
         {
-          "tcId": 13,
+          "tcId": 16,
           "comment": "flipped low bit of first ciphertext byte",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -294,7 +365,7 @@
           ]
         },
         {
-          "tcId": 14,
+          "tcId": 17,
           "comment": "flipped low bit of last tag byte",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -309,7 +380,7 @@
           ]
         },
         {
-          "tcId": 15,
+          "tcId": 18,
           "comment": "ciphertext truncated below tag length",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -324,7 +395,7 @@
           ]
         },
         {
-          "tcId": 16,
+          "tcId": 19,
           "comment": "empty ciphertext",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -339,7 +410,7 @@
           ]
         },
         {
-          "tcId": 17,
+          "tcId": 20,
           "comment": "trailing byte appended to ciphertext",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -354,7 +425,7 @@
           ]
         },
         {
-          "tcId": 18,
+          "tcId": 21,
           "comment": "enc and ct come from two different encapsulations to the same recipient",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -369,7 +440,7 @@
           ]
         },
         {
-          "tcId": 19,
+          "tcId": 22,
           "comment": "info does not match the one used to seal",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
@@ -384,7 +455,7 @@
           ]
         },
         {
-          "tcId": 20,
+          "tcId": 23,
           "comment": "aad does not match the one used to seal",
           "skRm": "22cb0f77932269c60746bbe32b4238763c9b40b90a75b610329724124fc50494",
           "pkRm": "0af6350c3e56ee7a78db61e026d204a91592cf3a758f5c2a71abf8b5fe8ddb2b",
