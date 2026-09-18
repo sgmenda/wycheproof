@@ -39,7 +39,8 @@ including
 - AES-GCM
 - AES-SIV
 - ARIA
-- ASCON v1.2 (not yet SP 800-232)
+- ASCON v1.2 AEAD (Ascon-128, Ascon-128a, Ascon-80pq; pre-standardization)
+- NIST SP 800-232 Ascon-AEAD128
 - Camellia
 - ChaCha20-Poly1305
 - [Chunked encryption (Cobblestone)](doc/c2sp_chunked_encryption.md)
@@ -86,15 +87,10 @@ us pull requests. You can also report bugs or request new tests as
 ## Development Priorities
 
 We're in the process of revitalizing development and maintenance of Project 
-Wycheproof as a C2SP project with a renewed focus on the test vector data. 
-Our immediate priorities are:
+Wycheproof as a C2SP project with a renewed focus on the test vector data.
 
-1. Completing JSON schema descriptions of all test vectors.
-2. Improving documentation and tooling support for external contributors to
-   provide new test data to existing vector files.
-3. Developing a community of downstream consumers who can help sheppard 
-   maintenance and review of new test vector data.
-4. Adding additional algorithm and test case coverage to the test vector data.
+Our immediate priority is adding additional algorithm and test case coverage to
+the test vector data.
 
 ## FAQ
 
@@ -151,20 +147,6 @@ coverage from `testvectors/` missing from `testvectors_v1/`, or there's another
 issue blocking your update please open an issue describing your needs.
 
 [`wycheproof-v0-vectors`]: https://github.com/C2SP/wycheproof/releases/tag/wycheproof-v0-vectors
-
-### Do all vectors have schemas?
-
-At the time of writing, the following `testvectors_v1` files are missing schemas:
-
-* `testvectors_v1/aes_ff1_base*_test.json`
-* `testvectors_v1/aes_ff1_radix*_test.json`
-* `testvectors_v1/ecdsa_secp256k1_sha256_bitcoin_test.json`
-* `testvectors_v1/pbes2_hmacsha*_aes_*_test.json`
-* `testvectors_v1/pbkdf2_hmacsha*_test.json`
-* `testvectors_v1/rsa_pss_*_sha*_mgf*_params_test.json`
-* `testvectors_v1/rsa_pss_misc_params_test.json`
-
-Contribution of schemas for the above vectors would be most welcome.
 
 ### Is there additional documentation about test vectors?
 
