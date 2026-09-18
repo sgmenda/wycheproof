@@ -46,9 +46,11 @@ The reject reason is KEM-specific:
   a check RFC 7748 leaves optional (`x25519_test.json` labels such keys
   `acceptable`). Wrong-length keys are rejected too.
 
-The ML-KEM encapsulation files are a single-implementation canary: among the
-implementations used to cross-validate these vectors, only AWS-LC implements
-ML-KEM in HPKE.
+The ML-KEM-in-HPKE vectors ([draft-ietf-hpke-pq][]) were cross-checked against
+AWS-LC, BoringSSL, and Bouncy Castle. Support is uneven: AWS-LC and Bouncy
+Castle implement all three sizes, while BoringSSL implements ML-KEM-768 and
+ML-KEM-1024 but not ML-KEM-512. Coverage is therefore thinner than for the
+classical DHKEM(X25519, HKDF-SHA256) ciphersuite.
 
 | Field  | Meaning |
 | ------ | ------- |
