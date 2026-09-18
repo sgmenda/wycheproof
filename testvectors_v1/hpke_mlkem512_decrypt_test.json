@@ -3,7 +3,7 @@
   "schema": "hpke_decrypt_test_schema.json",
   "numberOfTests": 26,
   "header": [
-    "Test vectors for HPKE (RFC 9180) single-shot Open in base mode using the ML-KEM-512 KEM from draft-ietf-hpke-pq. Among the implementations used to cross-validate the HPKE vectors, only AWS-LC implements ML-KEM-512 in HPKE, so these are a single-implementation canary (produced and checked by AWS-LC in both directions). The recipient private key skRm is the 64-byte d || z seed. Valid cases include ikmE, the 32-byte encapsulation randomness, so deterministic encapsulation reproduces enc and ct. Given (skRm, info, aad, enc, ct) an implementation runs SetupBaseR then Open and must recover pt for valid cases or reject invalid cases. See doc/hpke.md."
+    "Test vectors for HPKE (RFC 9180) single-shot Open in base mode using the ML-KEM-512 KEM from draft-ietf-hpke-pq. ML-KEM-512 in HPKE is implemented by AWS-LC and Bouncy Castle but not BoringSSL; these vectors are produced by AWS-LC and checked in both directions (SetupBaseS/Seal and SetupBaseR/Open). The recipient private key skRm is the 64-byte d || z seed. Valid cases include ikmE, the 32-byte encapsulation randomness, so deterministic encapsulation reproduces enc and ct. Given (skRm, info, aad, enc, ct) an implementation runs SetupBaseR then Open and must recover pt for valid cases or reject invalid cases. See doc/hpke.md."
   ],
   "notes": {
     "AllZeroEnc": {

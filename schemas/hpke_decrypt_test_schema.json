@@ -216,7 +216,14 @@
             "ML-KEM-512",
             "ML-KEM-768",
             "ML-KEM-1024",
-            "DHKEM(X25519, HKDF-SHA256)"
+            "MLKEM768-X25519",
+            "MLKEM768-P256",
+            "MLKEM1024-P384",
+            "DHKEM(P-256, HKDF-SHA256)",
+            "DHKEM(P-384, HKDF-SHA384)",
+            "DHKEM(P-521, HKDF-SHA512)",
+            "DHKEM(X25519, HKDF-SHA256)",
+            "DHKEM(X448, HKDF-SHA512)"
           ],
           "description": "The HPKE KEM"
         },

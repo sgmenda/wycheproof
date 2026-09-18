@@ -9,10 +9,11 @@ We include vectors for *only* the base mode and the following *subset* of KEMs:
 - ML-KEM-1024 (KEM id `0x0042`)
 - DHKEM(X25519, HKDF-SHA256) (KEM id `0x0020`)
 
-For each of these KEMs, we have two test vector files:
+For each of these KEMs, we have three test vector files:
 
 - `hpke_{KEM}_encap_test.json`
 - `hpke_{KEM}_decrypt_test.json`
+- `hpke_{KEM}_sequence_test.json`
 
 Each test group fixes one HPKE ciphersuite. `kem`, `kdf`, and `aead` give the
 human-readable names; `kemId`, `kdfId`, and `aeadId` give the two-byte
