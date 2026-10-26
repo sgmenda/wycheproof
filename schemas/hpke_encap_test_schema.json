@@ -42,12 +42,13 @@
   "definitions": {
     "HpkeEncapTestGroup": {
       "type": "object",
-      "description": "HPKE base-mode encapsulation (SetupBaseS), validating the recipient encapsulation key pkRm. Each group fixes one (KEM, KDF, AEAD) ciphersuite. Given pkRm and the ephemeral seed ikmE, an implementation deserializes pkRm and runs SetupBaseS, then Seal(pt, aad). For valid cases it MUST succeed and (deterministically) reproduce enc and ct; when skRm is present the sealed message also opens to pt. For invalid cases the encapsulation key is malformed and deserialization and/or SetupBaseS MUST fail (an HPKE EncapError), surfaced at key import or at encapsulation. The reject reason depends on the KEM: an ML-KEM key (draft-ietf-hpke-pq) fails the encapsulation-key check (FIPS 203 Section 7.2) or has the wrong length; a DHKEM(X25519) key that yields an all-zero Diffie-Hellman shared secret is rejected because RFC 9180 Section 5.1.1 requires DH to abort on an all-zero output, or it has the wrong length.",
+      "description": "HPKE base-mode encapsulation (SetupBaseS), validating the recipient encapsulation key pkRm. Each group fixes one (KEM, KDF, AEAD) ciphersuite. Given pkRm and the encapsulation randomness ikmE, an implementation deserializes pkRm and runs SetupBaseS, then Seal(aad, pt). For valid cases it MUST succeed and (deterministically) reproduce enc and ct; when skRm is present the sealed message also opens to pt. For invalid cases pkRm is malformed and deserialization or SetupBaseS MUST fail; which error surfaces, and at which step, is implementation-specific (RFC 9180 Section 8.2). Acceptable cases are interoperability probes that an implementation following RFC 9180 literally accepts; an implementation may reject them, but if it accepts one it MUST produce exactly the given output. The reject reason depends on the KEM. An ML-KEM key (draft-ietf-hpke-pq-05) fails the FIPS 203 Section 7.2 encapsulation-key check, either its type check (wrong length) or its modulus check (a coefficient at or above q); draft-ietf-hpke-pq-05 Section 3 makes such a failure an HPKE EncapError. A DHKEM(X25519) key either has the wrong length or is a small-order point whose Diffie-Hellman output is all-zero for every ephemeral key: RFC 9180 Section 7.1.4 requires that X25519 public keys and Diffie-Hellman outputs be validated as described in RFC 7748 (the all-zero check), for senders and recipients alike. A sender that skips the check encrypts under a shared secret anyone can compute, so these keys are invalid here, although x25519_test.json labels them acceptable.",
       "properties": {
         "type": {
           "enum": [
             "HpkeEncapTest"
-          ]
+          ],
+          "description": "A legacy field, test files contain only one type per file"
         },
         "source": {
           "$ref": "common.json#/definitions/Source"
@@ -58,30 +59,36 @@
             "ML-KEM-768",
             "ML-KEM-1024",
             "DHKEM(X25519, HKDF-SHA256)"
-          ]
+          ],
+          "description": "The HPKE KEM"
         },
         "kemId": {
-          "type": "integer"
+          "type": "integer",
+          "description": "The two-byte HPKE KEM identifier from the IANA HPKE KEM registry (RFC 9180, extended by draft-ietf-hpke-pq-05)"
         },
         "kdf": {
           "enum": [
             "HKDF-SHA256",
             "HKDF-SHA384",
             "HKDF-SHA512"
-          ]
+          ],
+          "description": "The HPKE KDF"
         },
         "kdfId": {
-          "type": "integer"
+          "type": "integer",
+          "description": "The two-byte HPKE KDF identifier (RFC 9180 Table 3)"
         },
         "aead": {
           "enum": [
             "AES-128-GCM",
             "AES-256-GCM",
             "ChaCha20Poly1305"
-          ]
+          ],
+          "description": "The HPKE AEAD"
         },
         "aeadId": {
-          "type": "integer"
+          "type": "integer",
+          "description": "The two-byte HPKE AEAD identifier (RFC 9180 Table 5)"
         },
         "tests": {
           "type": "array",
@@ -104,12 +111,17 @@
               "ikmE": {
                 "type": "string",
                 "format": "HexBytes",
-                "description": "Optional. The 32-byte seed fixing the sender's ephemeral key (the encapsulation randomness for ML-KEM, the ephemeral private key skEm for DHKEM(X25519)). Present for valid cases, where deterministic encapsulation reproduces enc and ct. Absent for invalid cases."
+                "description": "Optional. The 32-byte randomness input to deterministic encapsulation (ikmE in the RFC 9180 Appendix A test vectors; the input to EncapDerand in draft-ietf-hpke-hpke-05 Appendix C.1). For DHKEM(X25519) it is the DeriveKeyPair input for the sender's ephemeral key pair, (skE, pkE) = DeriveKeyPair(ikmE); for ML-KEM (draft-ietf-hpke-pq-05) it is the randomness m passed to FIPS 203 ML-KEM.Encaps_internal. Present on every case, valid, acceptable, or invalid: it is the randomness to use, not a validity marker. A harness that encapsulates through a derandomized test hook must still see invalid keys rejected on that path. For valid cases deterministic encapsulation reproduces enc and ct."
+              },
+              "skEm": {
+                "type": "string",
+                "format": "HexBytes",
+                "description": "Optional, DHKEM only. The sender's ephemeral private key skEm = SerializePrivateKey(skE), where (skE, pkE) = DeriveKeyPair(ikmE) and SerializePrivateKey is the identity for X25519 (draft-ietf-hpke-hpke-05 Section 7.1.2). Provided for deterministic-encapsulation test hooks that take the raw ephemeral private key rather than ikmE. Present on every DHKEM case, like ikmE; absent for ML-KEM, which has no ephemeral key pair. For X25519 this is the unclamped 32-byte string that DeriveKeyPair returns, matching the RFC 9180 Appendix A test vectors. The text of RFC 9180 Section 7.1.2 requires SerializePrivateKey to clamp, so an implementation that follows it (e.g. Go crypto/hpke PrivateKey.Bytes) re-serializes the key to different bytes; compare public keys or results, not re-serialized private keys. X25519 treats clamped and unclamped scalars identically (RFC 7748 Section 5); an API that requires a clamped scalar needs the key clamped before import. See doc/hpke.md."
               },
               "skRm": {
                 "type": "string",
                 "format": "HexBytes",
-                "description": "Optional. The recipient private key corresponding to pkRm, when one exists (the 64-byte d || z seed for ML-KEM, the 32-byte scalar for DHKEM(X25519)). Present lets a consumer additionally decapsulate enc and open ct to recover pt."
+                "description": "Optional. The recipient private key corresponding to pkRm, when one exists (the 64-byte d || z seed for ML-KEM, the 32-byte unclamped scalar for DHKEM(X25519)). Present lets a consumer additionally decapsulate enc and open ct to recover pt."
               },
               "info": {
                 "type": "string",
@@ -124,17 +136,17 @@
               "pt": {
                 "type": "string",
                 "format": "HexBytes",
-                "description": "The plaintext sealed for valid cases; empty for invalid cases"
+                "description": "The plaintext sealed for valid and acceptable cases; empty for invalid cases"
               },
               "enc": {
                 "type": "string",
                 "format": "HexBytes",
-                "description": "The KEM encapsulated key produced by SetupBaseS for valid cases; empty for invalid cases"
+                "description": "The KEM encapsulated key produced by SetupBaseS for valid and acceptable cases; empty for invalid cases"
               },
               "ct": {
                 "type": "string",
                 "format": "HexBytes",
-                "description": "The AEAD sealed message (ciphertext || tag) for valid cases; empty for invalid cases"
+                "description": "The AEAD sealed message (ciphertext || tag) for valid and acceptable cases; empty for invalid cases"
               },
               "result": {
                 "$ref": "common.json#/definitions/Result"
@@ -143,7 +155,8 @@
                 "type": "array",
                 "items": {
                   "type": "string"
-                }
+                },
+                "description": "A list of flags"
               }
             },
             "required": [

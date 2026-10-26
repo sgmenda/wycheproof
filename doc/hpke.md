@@ -1,159 +1,126 @@
 # HPKE
 
-Hybrid Public Key Encryption is specified in [RFC 9180][],
-and extended by [draft-ietf-hpke-pq][] to post-quantum KEMs.
+Hybrid Public Key Encryption is specified in [RFC 9180][] and extended to
+ML-KEM by [draft-ietf-hpke-pq-05][]. References to the revised HPKE
+specification are to [draft-ietf-hpke-hpke-05][].
 
-We include vectors for *only* the base mode and the following *subset* of KEMs:
+We include vectors for *only* the base mode (`mode_base`) and the following
+*subset* of KEMs:
+
 - ML-KEM-512  (KEM id `0x0040`)
 - ML-KEM-768  (KEM id `0x0041`)
 - ML-KEM-1024 (KEM id `0x0042`)
 - DHKEM(X25519, HKDF-SHA256) (KEM id `0x0020`)
 
-For each of these KEMs, we have three test vector files:
+For each of these KEMs there are three files:
 
 - `hpke_{KEM}_encap_test.json`
+  ([schema](../schemas/hpke_encap_test_schema.json)): `SetupBaseS` and
+  `Seal`, validating the recipient key `pkRm`;
 - `hpke_{KEM}_decrypt_test.json`
+  ([schema](../schemas/hpke_decrypt_test_schema.json)): single-shot
+  `SetupBaseR` and `Open`;
 - `hpke_{KEM}_sequence_test.json`
+  ([schema](../schemas/hpke_sequence_test_schema.json)): several `Open`
+  calls, in order, on one context.
 
-Each test group fixes one HPKE ciphersuite. `kem`, `kdf`, and `aead` give the
-human-readable names; `kemId`, `kdfId`, and `aeadId` give the two-byte
-identifiers from the IANA HPKE registries. All vectors use base mode
-(`mode_base`).
+The schemas describe every field and the meaning of `valid`, `invalid`, and
+`acceptable`. Each file's `notes` explain every flag: what the case tests,
+why it has its result, and known implementations it caught.
 
-### Encapsulation Test Vectors
+Most `invalid` decryption cases fail at the AEAD tag. Where the property
+under test is in the KEM, a tag failure would prove nothing, so `ct` is
+instead sealed under the key that a buggy receiver derives (for example, the
+all-zero X25519 output for `SmallOrderEnc`). For ML-KEM, the
+`ImplicitRejection`, `Strcmp`, and `MalleableCiphertext` cases are `valid`:
+`ct` is sealed under the implicit-rejection secret `K-bar = J(z || c)`, so
+`Open` must succeed.
 
-The `hpke_{KEM}_encap_test.json` files
-(schema [`hpke_encap_test_schema.json`](../schemas/hpke_encap_test_schema.json))
-exercise base-mode encapsulation (`SetupBaseS`) and validate the recipient
-encapsulation key `pkRm`, the subject of each case. Deserialize `pkRm`, run
-`SetupBaseS(pkRm, info)` seeded by `ikmE`, then `Seal(aad, pt)`:
+## Deterministic encapsulation
 
-- `valid` succeeds and reproduces `enc` and `ct`. When `skRm` is present, the
-  sealed `enc || ct` also opens back to `pt`.
-- `invalid` carries a malformed `pkRm` that `SetupBaseS` MUST reject, either at
-  key import or at encapsulation (an HPKE `EncapError`); `enc`, `ct`, and `pt`
-  are empty.
+`ikmE` is the 32-byte randomness input to deterministic encapsulation, as in
+RFC 9180 Appendix A (`EncapDerand` in draft-ietf-hpke-hpke-05 Appendix C.1).
+For DHKEM(X25519), `(skE, pkE) = DeriveKeyPair(ikmE)` and `skEm` is the
+derived ephemeral private key, for test hooks that take the raw key. For
+ML-KEM, `ikmE` is the randomness `m` passed to FIPS 203
+`ML-KEM.Encaps_internal`, and there is no `skEm`.
 
-The reject reason is KEM-specific:
+With such a hook, run `SetupBaseS(pkRm, info)` derandomized with `ikmE` (or
+`skEm`), then `Seal`, and compare `enc` and `ct` byte for byte. This also
+checks the sender direction of decryption and sequence cases that carry
+`ikmE`. In the encapsulation files `ikmE` is present on every case,
+including `invalid` ones, and a derandomized path must still reject those
+keys: some libraries check the key only on the public, randomized path.
 
-- **ML-KEM**: the encapsulation-key check (FIPS 203 Section 7.2) rejects a
-  coefficient at or past the modulus, or the key has the wrong length. An
-  all-zero ML-KEM key is `valid` — every coefficient is 0, below the modulus,
-  so the check passes and `SetupBaseS` must succeed; rejecting it is
-  over-strict.
-- **DHKEM(X25519)**: HPKE is stricter than plain X25519 here. A small-order
-  `pkRm` whose Diffie-Hellman output is all-zero MUST be rejected, because
-  RFC 9180 Section 5.1.1 requires `DH` to abort on an all-zero shared secret —
-  a check RFC 7748 leaves optional (`x25519_test.json` labels such keys
-  `acceptable`). Wrong-length keys are rejected too.
+An API that takes `enc || ct` as one buffer turns the `WrongLengthEnc` and
+`EncTrailingByteInContext` cases into ciphertext tampering. They still fail,
+but no longer test the `enc` length check.
 
-The ML-KEM-in-HPKE vectors ([draft-ietf-hpke-pq][]) were cross-checked against
-AWS-LC, BoringSSL, and Bouncy Castle. Support is uneven: AWS-LC and Bouncy
-Castle implement all three sizes, while BoringSSL implements ML-KEM-768 and
-ML-KEM-1024 but not ML-KEM-512. Coverage is therefore thinner than for the
-classical DHKEM(X25519, HKDF-SHA256) ciphersuite.
+## X25519 private keys are unclamped
 
-| Field  | Meaning |
-| ------ | ------- |
-| `pkRm` | Recipient encapsulation key under test; malformed for `invalid` cases. |
-| `ikmE` | Optional. Sender encapsulation randomness; present for `valid` cases so encapsulation is deterministic. |
-| `skRm` | Optional. Recipient private key matching `pkRm`, when one exists; lets a consumer additionally open `enc \|\| ct` back to `pt`. |
-| `info` | HPKE info string bound into the key schedule. |
-| `aad`  | Additional authenticated data passed to `Seal`. |
-| `pt`   | Plaintext sealed for `valid` cases; empty otherwise. |
-| `enc`  | KEM encapsulated key for `valid` cases; empty otherwise. |
-| `ct`   | AEAD sealed message (ciphertext `\|\|` tag) for `valid` cases; empty otherwise. |
+`skRm` and `skEm` are the 32-byte strings that `DeriveKeyPair` outputs,
+*unclamped*. This matches the values printed in RFC 9180 Appendix A and in
+draft-ietf-hpke-hpke-05, whose Section 7.1.2 says X25519 private keys "are
+identical to their byte string representation". The text of RFC 9180
+Section 7.1.2 instead says `SerializePrivateKey()` "MUST clamp its output",
+which contradicts its own Appendix A. [Erratum 7121][] records this and lists
+clamped replacement values (see also [cfrg/draft-irtf-cfrg-hpke#255][cfrg-255]).
+The revised specification resolves it the other way, by removing the clamping
+requirement ([hpkewg/hpke#39][hpke-clamp-issue], [hpkewg/hpke#42][hpke-clamp]).
 
-### Decryption Test Vectors
+X25519 clamps the scalar internally (RFC 7748 Section 5), so clamped and
+unclamped scalars give the same public key and shared secret. In practice:
 
-The `hpke_{KEM}_decrypt_test.json` files
-(schema [`hpke_decrypt_test_schema.json`](../schemas/hpke_decrypt_test_schema.json))
-exercise single-shot `Open` in base mode. Each case carries `info`, `aad`,
-`enc` (the KEM encapsulated key), `ct` (AEAD ciphertext followed by tag), and
-`pt`. Run `SetupBaseR(enc, skR, info)` then `Open(aad, ct)`:
+- Implementations that follow RFC 9180 Section 7.1.2 re-serialize `skRm` to
+  different, clamped bytes: Go's `crypto/hpke` (`PrivateKey.Bytes()`) and
+  [rust-hpke][rust-hpke-clamp] from 0.15.0. BoringSSL and AWS-LC return the
+  bytes as given. Compare public keys or decryption results, not
+  re-serialized private keys.
+- Some X25519 APIs require an already-clamped scalar. For example, wolfSSL's
+  `wc_curve25519_make_pub` and `wc_curve25519_generic` reject an unclamped
+  scalar. Clamp before passing the scalar to such an API.
 
-- `valid` recovers exactly `pt`.
-- `invalid` fails, with empty `pt`. The KEM rejects a wrong-length `enc` (and,
-  for DHKEM(X25519), a small-order `enc`; see
-  [Encapsulation Test Vectors](#encapsulation-test-vectors)). Otherwise a
-  tampered `enc`, `ct`, `aad`, or `info` fails at the AEAD tag: a modified
-  `enc` yields a different shared secret — ML-KEM implicit rejection, or a
-  different DHKEM ephemeral — so `Open` still fails at the tag.
+## Not covered
 
-An implementation that keeps `enc` and `ct` as one blob concatenates
-`enc || ct`; one with a separate setup/open API passes them individually.
+- PSK, Auth, and AuthPSK modes.
+- Other KEMs, including the other DHKEMs and the hybrid KEMs of
+  draft-ietf-hpke-pq-05 (MLKEM768-X25519, which takes over KEM id `0x647a`,
+  registered by IANA as X-Wing; MLKEM768-P256; MLKEM1024-P384).
+- `DeriveKeyPair` vectors (`ikmR` to `skRm` and `pkRm`).
+- The secret export interface (`Export`).
+- `MessageLimitReachedError` (RFC 9180 Section 5.2). Reaching it requires
+  setting the sequence number directly, and the vector format has no way to
+  express that.
+- A 16-bit sequence counter, which would take 65537 messages to detect.
 
-`skRm` is the serialized recipient private key (`SerializePrivateKey`): the
-64-byte `d || z` seed for the ML-KEM KEMs (`Nsk = 64`, the expanded key
-re-derived via `ML-KEM.KeyGen_internal`), and the 32-byte scalar for
-DHKEM(X25519) (`Nsk = 32`). `pkRm` is the serialized public (encapsulation)
-key; it can also be derived from `skRm`.
+## Verification
 
-Valid decryption cases also carry `ikmE`, the 32-byte seed that fixes the
-sender's ephemeral key: for ML-KEM the encapsulation randomness, for
-DHKEM(X25519) the ephemeral private key `skEm` (what a deterministic
-encapsulation hook consumes, not RFC 9180's `DeriveKeyPair` ikm). With `ikmE`
-fixed, encapsulation is deterministic, so an implementation with such a hook
-can also check the sender direction: run `SetupBaseS(pkRm, info)` seeded with
-`ikmE`, `Seal` `pt` with `aad`, and confirm `enc` and `ct` reproduce byte for
-byte. The recorded values were produced this way against AWS-LC's test API.
-Without such a hook, test by round-trip: `Seal` to `pkRm`, then `Open` and
-check it recovers the message. Negative cases carry no `ikmE`.
+The vectors were generated with AWS-LC. Ciphertexts that AWS-LC cannot
+produce (forged and non-canonical X25519 cases, the X25519 HKDF-SHA384 and
+HKDF-SHA512 groups, and the ML-KEM implicit-rejection cases) were sealed by a
+separate Python implementation of RFC 9180. The generators are not published.
 
-| Field  | Meaning |
-| ------ | ------- |
-| `skRm` | Serialized recipient private key (`d \|\| z` seed for ML-KEM, scalar for DHKEM). |
-| `pkRm` | Serialized recipient public key; derivable from `skRm`, provided for convenience. |
-| `ikmE` | Optional. Seed fixing the sender's ephemeral key; present for `valid` cases, absent for negative cases. |
-| `info` | HPKE info string bound into the key schedule. |
-| `aad`  | Additional authenticated data passed to `Open`. |
-| `enc`  | KEM encapsulated key consumed by `SetupBaseR`. |
-| `ct`   | AEAD sealed message (ciphertext `\|\|` tag). |
-| `pt`   | Expected recovered plaintext for `valid` cases; empty otherwise. |
+Every file was checked against implementations other than the producer, as
+follows. "Encap" means the implementation accepted or rejected each key as
+labeled; "derandomized" means it also reproduced `enc` and `ct` from `ikmE`
+or `skEm`.
 
-The decryption files also include valid cases whose `info`, `aad`, or `pt`
-contain *embedded* zero bytes (not merely empty values), which catch a consumer
-that mishandles interior NULs, e.g. by treating a length-prefixed field as
-null-terminated.
+| Implementation | Decrypt | Encap | Sequence |
+| -------------- | ------- | ----- | -------- |
+| AWS-LC (the producer) | all files except the X25519 HKDF-SHA512 group | all files, derandomized | all files |
+| BoringSSL | X25519 (except HKDF-SHA512), ML-KEM-768, ML-KEM-1024 | same KEMs, derandomized | same KEMs |
+| Bouncy Castle Java | all files | all files, derandomized | all files |
+| Go `crypto/hpke` | X25519, ML-KEM-768, ML-KEM-1024 | same KEMs, derandomized | same KEMs |
+| pyca/cryptography | X25519, ML-KEM-768, ML-KEM-1024 | same KEMs | not checked |
 
-### Sequence Decryption Test Vectors
-
-The `hpke_{KEM}_sequence_test.json` files (same
-[`hpke_decrypt_test_schema.json`](../schemas/hpke_decrypt_test_schema.json),
-group type `HpkeSequenceTest`) exercise the fact that HPKE `Open` is *stateful
-and ordered*. The recipient runs `SetupBaseR(enc, skR, info)` once, then calls
-`Open` once per message; the AEAD nonce for message `i` is `base_nonce XOR i`.
-
-Each case carries a single `enc` and an ordered `decryptions` list. The consumer
-opens the entries in order against one context; each entry has its own
-`sequenceNumber`, `aad`, `ct`, `pt`, and `result`. A `valid` entry MUST recover
-its `pt`; an `invalid` entry MUST fail. Beyond a straightforward in-order
-sequence, the negatives capture what single-shot cases cannot:
-
-- **out-of-order**: a ciphertext sealed at one position is presented at another,
-  so the nonce does not match and `Open` fails at the tag;
-- **replay**: a ciphertext already opened is presented again at a later
-  sequence number;
-- **skip**: a later ciphertext is opened after skipping a sequence number.
-
-| Field         | Meaning |
-| ------------- | ------- |
-| `enc`         | KEM encapsulated key, consumed once by `SetupBaseR`. |
-| `decryptions` | Ordered messages to `Open` on the one context. |
-| `decryptions[].sequenceNumber` | Context sequence number for this `Open` (0-based, equal to list position). |
-| `decryptions[].aad` | Associated data passed to `Open`. |
-| `decryptions[].ct`  | AEAD sealed message (ciphertext `\|\|` tag) to open at this sequence number. |
-| `decryptions[].pt`  | Expected recovered plaintext when `result` is `valid`; empty otherwise. |
-| `decryptions[].result` | `valid` if this `Open` must succeed, `invalid` if it must fail. |
-
-### Additional Test Vectors
-
-None yet. Every current case is generated by Wycheproof (`source.name =
-"wycheproof"`). The published specifications carry their own worked examples —
-RFC 9180 Appendix A for the classical DHKEM ciphersuites, and the
-[draft-ietf-hpke-pq][] test vectors for the ML-KEM KEMs — which would make a
-good independent cross-check. Importing them (with `source` pointing at the
-spec) is a planned addition; this section is a placeholder until then.
+Bouncy Castle and Go were development builds. The ML-KEM-512 files are
+checked only by Bouncy Castle besides the producer.
 
 [RFC 9180]: https://www.rfc-editor.org/rfc/rfc9180
-[draft-ietf-hpke-pq]: https://datatracker.ietf.org/doc/draft-ietf-hpke-pq/
+[draft-ietf-hpke-pq-05]: https://datatracker.ietf.org/doc/html/draft-ietf-hpke-pq-05
+[draft-ietf-hpke-hpke-05]: https://datatracker.ietf.org/doc/html/draft-ietf-hpke-hpke-05
+[Erratum 7121]: https://www.rfc-editor.org/errata/eid7121
+[cfrg-255]: https://github.com/cfrg/draft-irtf-cfrg-hpke/issues/255
+[hpke-clamp]: https://github.com/hpkewg/hpke/pull/42
+[hpke-clamp-issue]: https://github.com/hpkewg/hpke/issues/39
+[rust-hpke-clamp]: https://github.com/rozbb/rust-hpke/pull/122
