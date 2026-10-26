@@ -1,8 +1,7 @@
 # HPKE
 
 Hybrid Public Key Encryption is specified in [RFC 9180][] and extended to
-ML-KEM by [draft-ietf-hpke-pq-05][]. References to the revised HPKE
-specification are to [draft-ietf-hpke-hpke-05][].
+ML-KEM by [draft-ietf-hpke-pq-05][].
 
 We include vectors for *only* the base mode (`mode_base`) and the following
 *subset* of KEMs:
@@ -92,29 +91,6 @@ unclamped scalars give the same public key and shared secret. In practice:
   setting the sequence number directly, and the vector format has no way to
   express that.
 - A 16-bit sequence counter, which would take 65537 messages to detect.
-
-## Verification
-
-The vectors were generated with AWS-LC. Ciphertexts that AWS-LC cannot
-produce (forged and non-canonical X25519 cases, the X25519 HKDF-SHA384 and
-HKDF-SHA512 groups, and the ML-KEM implicit-rejection cases) were sealed by a
-separate Python implementation of RFC 9180. The generators are not published.
-
-Every file was checked against implementations other than the producer, as
-follows. "Encap" means the implementation accepted or rejected each key as
-labeled; "derandomized" means it also reproduced `enc` and `ct` from `ikmE`
-or `skEm`.
-
-| Implementation | Decrypt | Encap | Sequence |
-| -------------- | ------- | ----- | -------- |
-| AWS-LC (the producer) | all files except the X25519 HKDF-SHA512 group | all files, derandomized | all files |
-| BoringSSL | X25519 (except HKDF-SHA512), ML-KEM-768, ML-KEM-1024 | same KEMs, derandomized | same KEMs |
-| Bouncy Castle Java | all files | all files, derandomized | all files |
-| Go `crypto/hpke` | X25519, ML-KEM-768, ML-KEM-1024 | same KEMs, derandomized | same KEMs |
-| pyca/cryptography | X25519, ML-KEM-768, ML-KEM-1024 | same KEMs | not checked |
-
-Bouncy Castle and Go were development builds. The ML-KEM-512 files are
-checked only by Bouncy Castle besides the producer.
 
 [RFC 9180]: https://www.rfc-editor.org/rfc/rfc9180
 [draft-ietf-hpke-pq-05]: https://datatracker.ietf.org/doc/html/draft-ietf-hpke-pq-05
